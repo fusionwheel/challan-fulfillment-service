@@ -1,0 +1,43 @@
+# --- Playwright Specific ---
+# Test results and artifacts (Screenshots, Videos, Traces)
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# --- Python Environment ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# --- Testing / Coverage ---
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- IDE & OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# TOKEN
+.token_info.json
+
+# SCREENSHOTS
+screenshots/
+
+# USER DATA
+user_data/
+
+# LOGS
+logs/
+
+# .SVC
+.svc/
+token_info.json
