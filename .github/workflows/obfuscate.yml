@@ -26,7 +26,7 @@ jobs:
         run: |
           # -r obfuscates the whole folder recursively
           # --output dist/ puts everything in a clean folder
-          pyarmor gen -r -o dist/ main.py
+          pyarmor gen -r dist/ main.py
 
       - name: Prepare Artifacts
         run: |
