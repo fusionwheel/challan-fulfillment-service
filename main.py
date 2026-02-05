@@ -12,8 +12,9 @@ hostname = socket.gethostname()
 IPAddr = socket.gethostbyname(hostname)
 print(f"PC Worker Hostname: {hostname} | IP: {IPAddr}")
 
+
 def acknowledge(uniq_id, order_item_id, status, state, data):
-    url = "https://p376z7jfse.execute-api.ap-south-1.amazonaws.com/test/api/v1/c2b/vas/challan-item/status"
+    url = os.environ['C24_ACK_URL']
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1.1 Safari/605.1.15",
         "Content-Type": "application/json"
@@ -242,7 +243,8 @@ def validate_environment():
         "ICICI_NETBANKING_PASSWORD",
         "MOB_NO_FOR_OTP",
         "FW_CLIENT_ID",
-        "FW_CLIENT_SECRET"
+        "FW_CLIENT_SECRET",
+        "C24_ACK_URL"
     ]
     missing_vars = [var for var in required_vars if not os.getenv(var)]
     if missing_vars:
