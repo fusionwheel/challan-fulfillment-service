@@ -53,7 +53,7 @@ class HardwareOTPManager:
                     self.send_command('AT+CMGD=1,4') 
                     return otp
             
-            print(f"Scan {i+1}/15: No match yet...")
+            #print(f"Scan {i+1}/15: No match yet...")
             time.sleep(2)
             
         return None
