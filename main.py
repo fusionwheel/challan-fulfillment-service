@@ -232,7 +232,23 @@ def callback(message):
         # Message will reappear in the queue for another PC after 'visibility timeout'
         message.nack()
 
-
+def validate_environment():
+    required_vars = [
+        "ENV",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "GOOGLE_CLOUD_PROJECT",
+        "SUBSCRIPTION_ID",
+        "ICICI_NETBANKING_USER_ID",
+        "ICICI_NETBANKING_PASSWORD",
+        "MOB_NO_FOR_OTP",
+        "FW_CLIENT_ID",
+        "FW_CLIENT_SECRET"
+    ]
+    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    if missing_vars:
+        print(f"Error: Missing required environment variables: {', '.join(missing_vars)}")
+        exit(1)
+    
 if __name__ == '__main__':
     # --- Subscriber Setup ---
     import os
@@ -240,6 +256,8 @@ if __name__ == '__main__':
     from google.cloud import pubsub_v1
     
     load_dotenv()
+    
+    validate_environment()
     
     PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
     SUBSCRIPTION_ID = os.getenv("SUBSCRIPTION_ID", "fusionwheel.fulfillment.stage-sub")

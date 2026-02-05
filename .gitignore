@@ -41,3 +41,11 @@ logs/
 # .SVC
 .svc/
 token_info.json
+
+# build files
+build/
+dist/
+*.egg-info/
+*.whl
+__pypackages__/
+*.c
