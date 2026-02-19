@@ -9,7 +9,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from sqlalchemy import create_engine, Column, String, Integer, Enum as SQLEnum, JSON, ForeignKey, Text
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
-from fulfillment import process
+from fulfillment import process_from_queue
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -96,7 +96,7 @@ def process_row_sync(job_id: str, row_index: int, row_data: dict):
         
         # Your long-running workflow logic here
         time.sleep(5)  # Simulate long processing (replace with actual logic)
-        result = process(**row_data)
+        result = process_from_queue(**row_data)
         # Update to completed
         job_row.status = TaskStatus.COMPLETED
         job_row.result = result

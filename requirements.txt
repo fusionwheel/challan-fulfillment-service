@@ -10,3 +10,6 @@ uvicorn
 sqlalchemy
 psycopg2-binary
 python-multipart
+google-cloud-pubsub>=2.0.0
+memory-profiler
+uvicorn

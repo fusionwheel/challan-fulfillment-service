@@ -18,8 +18,8 @@ class ChallanOrderPublishView:
         errors = {}
         
         # Rule: Either app_id or order_item_id required
-        if not data.get('app_id') and not data.get('order_item_id'):
-            errors['id_error'] = "Either app_id or order_item_id is required."
+        if not data.get('appointment_id') and not data.get('order_item_id'):
+            errors['id_error'] = "Either appointment_id or order_item_id is required."
             
         # Add other mandatory field checks here if necessary
         mandatory_fields = ['reg_no', 'challan_no', 'amount']

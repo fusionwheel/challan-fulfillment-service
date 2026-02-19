@@ -1,4 +1,4 @@
-bq mk --location=asia-south2 payment_automation
+# bq mk --location=asia-south2 payment_automation
 
 bq mk --table \
 --expiration 259200 \

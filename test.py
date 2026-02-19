@@ -1,42 +1,63 @@
 import os
-from workflow.core.fw import FWLink
-from sms.adb_manager import ADBOTPManager
+import subprocess
+from fulfillment import process_from_queue
 
 
-APP_ID = "10141409756"
-CHALLAN_NO = "HR46416250914125073"
-
-
-
+# VAS CHALLAN
+ORDER_ITEM_ID = None
+APPOINTMENT_ID = "OVS-0004814288"
+REG_NO = "TN01BQ3115"
+CHALLAN_NO = "TN413998231014020645"
+payment_remarks = "092cI"
 
 if __name__ == "__main__":
     from dotenv import load_dotenv
-    
+    import signal
     load_dotenv()
+
+    import psutil
+
+    def kill_port(port):
+        """Finds and kills all processes listening on a specific port."""
+        found = False
+        for proc in psutil.process_iter(['pid', 'name']):
+            try:
+                # Check all network connections for this process
+                connections = proc.net_connections()
+                for conn in connections:
+                    if conn.laddr.port == port:
+                        print(f"Found {proc.info['name']} (PID: {proc.info['pid']}) on port {port}")
+                        # Force kill the process
+                        proc.send_signal(signal.SIGKILL) 
+                        print(f"Successfully killed PID {proc.info['pid']}")
+                        found = True
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        if not found:
+            print(f"No processes found running on port {port}")
     
-    print("FW_CLIENT_ID", os.getenv("FW_CLIENT_ID"))
-    print("FW_CLIENT_SECRET", os.getenv("FW_CLIENT_SECRET"))
-    print("C24_API_KEY", os.getenv("C24_API_KEY"))
-    print("C24_BASE_URL", os.getenv("C24_BASE_URL"))
+    # start sms worker
+    from sms_worker import app
+    HOST = os.environ.get("SMS_HOST", "0.0.0.0")
+    PORT = os.environ.get("SMS_PORT", "9090")
+    # You must specify the host and port explicitly for the subprocess to find it
+    try:
+        kill_port(PORT)
+        proc = subprocess.Popen(["uvicorn", "sms_worker:app", "--host", HOST, "--port", PORT])
     
-    #otp_details = ADBOTPManager(sender_name="ICICI").get_otp_details()
-    #print("otp =>", otp_details)
-    
-    fw_link = FWLink.from_appointment_id(app_id=APP_ID, challan_no=CHALLAN_NO)
-    print(fw_link.reg_no)
-    print(fw_link.challan_no)
-    print(fw_link.owner_mobile_no)
-    print(fw_link.owner_name)
-    data = fw_link.send_otp(mobile_no="9266882972")
-    print(data)
-    
-    adb_manager = ADBOTPManager(sender_name="VAAHAN")
-    otp_details = adb_manager.get_otp_details(body_contains="getting challan detail at eChallan")
-    print("otp =>", otp_details)
-    
-    verification_data = fw_link.verify_otp(otp=otp_details.get("otp"))
-    print("verification_data =>", verification_data)
-    
-    # 2 for HR
-    payment_data = fw_link.generate_payment_link(verify_payment=2)
-    print("payment_data =>", payment_data)
+        data = {
+            "order_item_id": ORDER_ITEM_ID,
+            "appointment_id": APPOINTMENT_ID,
+            "reg_no": REG_NO,
+            "challan_no": CHALLAN_NO,
+            "payment_remarks": payment_remarks,
+            "owner_name": "NA",
+            "owner_mobile_no": "9266882972" 
+        }
+        
+        result = process_from_queue(**data)
+        print("result", result)
+    except KeyboardInterrupt:
+        proc.terminate()
+        proc.wait()
+        

@@ -34,7 +34,7 @@ screenshots/
 
 # USER DATA
 user_data/
-
+user_data_*/
 # LOGS
 logs/
 
@@ -49,3 +49,7 @@ dist/
 *.whl
 __pypackages__/
 *.c
+
+**.zip
+**Untitled-1.css
+.venv312/

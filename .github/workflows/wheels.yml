@@ -42,7 +42,7 @@ jobs:
       - name: Verify compiled imports
         run: |
           cd dist
-          python -c "from workflow.services import utils; print('Cython OK')"
+          python -c "from challan_workflow.services import utils; print('Cython OK')"
 
       - name: Zip dist
         run: |
