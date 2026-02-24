@@ -32,7 +32,7 @@ class BillDeskSDKPaymentPage(BasePage):
             self.page.mouse.click(abs_x, abs_y)
         else:
             # Fallback
-            element_locator.click()
+            element_locator.click(force=True)
             
     def select_net_banking_tab(self):
         # The tab text is usually "Net Banking"
@@ -57,7 +57,7 @@ class BillDeskSDKPaymentPage(BasePage):
         bank_option =  self.frame.get_by_text(bank_display_name, exact=False).first
         #try:
         bank_option.wait_for(state="attached", timeout=10000)
-        bank_option.scroll_into_view_if_needed()
+        bank_option.scroll_into_view_if_needed(timeout=10000)
         self.human_click_in_frame(bank_option)
         print(f"Selected: {bank_display_name}")
         bank_option.wait_for(state="detached", timeout=15000)

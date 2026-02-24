@@ -2,6 +2,7 @@ import os
 import json
 import requests
 from challan_workflow import config
+from challan_workflow.base import exception as base_exception
 from datetime import datetime, timedelta
 import socket
 import gc
@@ -39,7 +40,7 @@ def acknowledge(uniq_id, order_item_id, status, state, data):
         "receipt_url": data.get("receipt_url")
     }
     print(f"Sending acknowledge for uniq_id: {uniq_id}, order_item_id: {order_item_id} | ack payload: {payload}")
-    response = requests.post(url, headers=headers, json=payload)
+    response = requests.post(url, headers=headers, json=payload, timeout=30)
     print("ack_ch_fulfillment", response.text)
     if response.status_code == 200:
         return True
@@ -55,7 +56,8 @@ def publish_log(data:dict):
             "origin": f"pc-worker-{hostname or os.uname().nodename}",
             "device_id": f"device-{IPAddr}",
             "priority": "high",
-            "env": os.getenv("ENV", "development")
+            "env": os.getenv("ENV", "development"),
+            "logged_at": datetime.now().isoformat()
         }
         payload = {**data, **extra}
         response = requests.post(url, headers=headers, json=payload, timeout=30)
@@ -65,7 +67,16 @@ def publish_log(data:dict):
 
 def get_log_data(data:dict, extra):
     return {**data, **extra}
-    
+
+def ack_to_tech_api_and_publish_log(uniq_id, order_item_id, status, state, result_data, log_data):
+    try:
+        acknowledge(uniq_id, order_item_id, status, state, result_data)
+        publish_log(log_data)
+    except Exception as e:
+        print(f"Challan fulfillment tech ack api call failed => uniq_id: {uniq_id}, order_item_id: {order_item_id} | {e}")
+        # log data 
+        log_data['exception'] = "Tech ack api call failed " + str(e)
+        publish_log(log_data)
 
 def process_fulfillment(data):
     uniq_id = data.get("id") or data.get("id_challan_item")
@@ -106,29 +117,25 @@ def process_fulfillment(data):
         if st_cd not in config.LIVE_ST_CODES:
             status = "FAILED"
             state = "INIT_FAILED"
-            reason = f"Challan not live for this state {st_cd}"
-            # ack to tech api
-            acknowledge(uniq_id, order_item_id, status, state, {"reason": reason})
-            # log data 
+            reason = f"Challan not live for this state"
+            # ack to tech api and publish log
             log_data = get_log_data(data, extra={
                 "status": status, "state": state, "step": "CALLBACK", "message": reason
-            })    
+            })
+            ack_to_tech_api_and_publish_log(uniq_id, order_item_id, status, state, {"reason": reason}, log_data)
             print(f"Challan not live for state codes => {st_cd}")
-            publish_log(log_data)
             return
         
         if (category or "E_CHALLAN") not in config.LIVE_CATEGORY_CODES:
             status = "FAILED"
             state = "INIT_FAILED"
-            reason = f"Challan not live for this category {category}"
-            # ack to tech api
-            acknowledge(uniq_id, order_item_id, status, state, {"reason": reason})
-            # log data 
+            reason = f"Challan not live for this category"
+            # ack to tech api and publish log
             log_data = get_log_data(data, extra={
                 "status": status, "state": state, "step": "CALLBACK", "message": reason
             }) 
+            ack_to_tech_api_and_publish_log(uniq_id, order_item_id, status, state, {"reason": reason}, log_data)
             print(f"Challan not live for category codes => {category}")
-            publish_log(log_data)
             return
         
         if isinstance(valid_till, str):
@@ -136,16 +143,16 @@ def process_fulfillment(data):
         
         if valid_till and valid_till < datetime.now() + timedelta(minutes=5): # 5 mins buffer
             status = "FAILED"
-            state = "INIT_FAILED"
-            reason = "Challan order expired"
+            state = "TAT_EXPIRED"
+            reason = "Challan order TAT expired"
             # ack to tech api (dont need to ack for expired challans)
             # acknowledge(uniq_id, order_item_id, status, state, {"reason": reason})
             # log data
             log_data = get_log_data(data, extra={
                 "status": status, "state": state, "step": "CALLBACK", "message": reason
             }) 
+            ack_to_tech_api_and_publish_log(uniq_id, order_item_id, status, state, {"reason": reason}, log_data)
             print(f"Challan order expired.. => {valid_till}")
-            publish_log(log_data)
             return
         
         response = process_from_queue(
@@ -173,7 +180,7 @@ def process_fulfillment(data):
             
             ack_data = {
                 "settlement_amount": data.get("amount"),
-                "pg_charges":  round(float(pg_charges) - float(data.get("amount")), 2),
+                "pg_charges":  round(float(pg_charges) - float(data.get("amount") or 0), 2),
                 "receipt_url": response.get("receipt_url")
             }
         
@@ -188,26 +195,20 @@ def process_fulfillment(data):
             "pg_charges": round(float(pg_charges) - float(data.get("amount") or 0), 2) if pg_charges else 0,
             "receipt_url": ack_data.get("receipt_url")
         })
-        try:
-            # ack to tech api
-            acknowledge(uniq_id, order_item_id, status, state, ack_data)
-            # log data 
-            publish_log(log_data)
-        except Exception as e:
-            print(f"Challan fulfillment tech ack api call failed => uniq_id: {uniq_id}, order_item_id: {order_item_id} | {e}")
-            # log data 
-            log_data['exception'] = str(e)
-            publish_log(log_data)
-        finally:
-            # logs to bq
-            print(f"Challan fulfillment acknowledged => uniq_id: {uniq_id}, order_item_id: {order_item_id} | status: {status} | state: {state}")
         
+        if str(status).upper() == "FAILED" and state in ["PAYMENT_FAILED"]:
+            #publish_log(log_data)
+            # after raise exception log data will be published in except block 
+            # raise exception to retry
+            raise Exception("Payment Failed")
+        
+        ack_to_tech_api_and_publish_log(uniq_id, order_item_id, status, state, ack_data, log_data)
+        print(f"Challan fulfillment acknowledged => uniq_id: {uniq_id}, order_item_id: {order_item_id} | status: {status} | state: {state}")
+    
     except Exception as e:
-        # ack to tech api
-        acknowledge(uniq_id, order_item_id, "FAILED", "LINK_FAILED", data)
-        # log data 
+        # here only log data 
         log_data = get_log_data(data, extra={
-            "status": status or "FAILED",
+            "status": str(status).upper() if status else "FAILED",
             "state": state or "LINK_FAILED",
             "message": reason or str(e),
             "exception": str(e),
@@ -219,7 +220,7 @@ def process_fulfillment(data):
         })    
         publish_log(log_data)
         print(f"Challan fulfillment failed => {e}")
-        return
+        raise e
 
 def callback(message):
     global _processed_messages
@@ -240,9 +241,21 @@ def callback(message):
             )
         except Exception:
             pass
-        # --- BUSY STATE START ---
-        # 1. Parse account data from Pub/Sub
-        challan_data = json.loads(message.data.decode("utf-8"))
+        
+        try:
+            challan_data = json.loads(message.data.decode("utf-8"))
+        except json.JSONDecodeError as e:
+            publish_log({
+                "status": "FAILED", 
+                "state": "PRE_CALLBACK_FAILED", 
+                "step": "PRE_CALLBACK", 
+                "data": message.data.decode("utf-8"), 
+                "exception": str(e), 
+                "message": f"Error parsing message: {e}"
+            })
+            print(f"Error parsing message: {e}")
+            message.ack()
+            return
 
         print(challan_data)
 
@@ -254,11 +267,11 @@ def callback(message):
         # --- READY STATE ---
 
     except Exception as e:
-        print(f"Error occurred: {e}")
+        print(f" Error occurred: {e}")
         if challan_data is None:
             challan_data = {}
         log_data = get_log_data(challan_data, extra={
-            "status": "failed",
+            "status": "FAILED",
             "state":  "PRE_CALLBACK_FAILED",
             "message": str(e),
             "step": "PRE_CALLBACK",
@@ -266,11 +279,13 @@ def callback(message):
         })
         publish_log(log_data)
         # Message will reappear in the queue for another PC after 'visibility timeout'
+        print("*" * 50)
+        print("Transaction Failed will be retried => order_item_id: ", challan_data.get("order_item_id"))
+        print("*" * 50)
         message.nack()
     finally:
         # Explicitly drop references to large per-message objects
         del challan_data
-        gc.collect()
 
         _processed_messages += 1
         if _processed_messages >= MAX_MESSAGES_PER_WORKER:

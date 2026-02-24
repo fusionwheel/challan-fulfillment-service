@@ -232,10 +232,10 @@ class Parivahan:
             response = self.process_request("POST", url, headers=self.headers(), allow_redirects=True, proxies=self.get_proxies())
             response.raise_for_status()
             result = response.json()
-            logger.info(f"  Parivahan service | ✓ Payment Verification response: {result}")
+            print(f"  Parivahan service | ✓ Payment Verification response: {result}")
             if response.status_code == 200:
                 if str(result.get("status")) == "203":
-                    logger.info("  Parivahan service | ✓ Payment already verified.")
+                    print("  Parivahan service | ✓ Payment already verified.")
                     return True
                 if str(result.get("status")) == "200":
                     # OLD GATEWAY

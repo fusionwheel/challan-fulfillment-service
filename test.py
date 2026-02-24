@@ -4,11 +4,11 @@ from fulfillment import process_from_queue
 
 
 # VAS CHALLAN
-ORDER_ITEM_ID = None
-APPOINTMENT_ID = "OVS-0004814288"
-REG_NO = "TN01BQ3115"
-CHALLAN_NO = "TN413998231014020645"
-payment_remarks = "092cI"
+ORDER_ITEM_ID = 2180250
+APPOINTMENT_ID = "OVS-0004826989_4826989"
+REG_NO = "UP80GV8142"
+CHALLAN_NO = "UP604250520072826"
+payment_remarks = "099BK"
 
 if __name__ == "__main__":
     from dotenv import load_dotenv

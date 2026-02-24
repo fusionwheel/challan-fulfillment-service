@@ -130,6 +130,8 @@ class PaymentLinkContext(WorkflowContext):
                 if payment_data:
                     break
             except exception.OTPNotFound:
+                time.sleep(30)
+                max_retry_count = 5
                 if i == max_retry_count - 1:
                     raise exception.OTPNotFound("OTP not found !")
                 continue
@@ -138,7 +140,10 @@ class PaymentLinkContext(WorkflowContext):
                     if "challan payment is pending" in e.message.lower():
                         print("  =>Payment Link Already Generated! but challan payment is pending")
                         print("  =>Verifying Payment...")
-                        self.get_payment_data(verify_payment=1)
+                        max_retry_count = 4
+                        for _ in range(2):
+                            if self.get_payment_data(verify_payment=1):
+                                break
                         # verify payment to get existing link
                         continue
                 except:

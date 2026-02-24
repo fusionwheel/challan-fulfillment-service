@@ -43,7 +43,7 @@ class APWorkflow(BaseWorkflow):
     def get_workflow_steps(self):
         return self.inital_steps
     
-    def run_state_workflow(self):
+    def run(self):
         # initial steps
         for klass in self.get_workflow_steps():
             try:
@@ -52,11 +52,11 @@ class APWorkflow(BaseWorkflow):
             finally:
                 del step; gc.collect()
     
-        # gateway steps
-        gateway_steps = self.steps_sbi_epay if getattr(self.context, "gateway", "") == "SBI" else self.steps_cfms
-        all_steps = gateway_steps + self.complete_steps
+        # further steps based on. gateway chosen in inital steps
+        further_steps = self.steps_sbi_epay if getattr(self.context, "gateway", "") == "SBI" else self.steps_cfms
+        further_steps = further_steps + self.complete_steps
     
-        for klass in all_steps:
+        for klass in further_steps:
             try:
                 step = klass(self.page, ctx=self.context, **self.context.to_dict())
                 step.proceed()

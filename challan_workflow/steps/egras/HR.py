@@ -26,6 +26,7 @@ class EgrassGrnPage(BasePage):
                         legacy.remove();
                     }
                     
+                    /*
                     if (window.Swal && !Swal.__autoCloseInstalled) {
                         Swal.__autoCloseInstalled = true;
 
@@ -36,6 +37,7 @@ class EgrassGrnPage(BasePage):
                             return p;
                         };
                     }
+                    */
                     
                     // Generic HTML modal buttons (OK / Close only)
                     const keywords = ['ok', 'close'];
@@ -56,14 +58,60 @@ class EgrassGrnPage(BasePage):
             self.wait_for_timeout(1000)
         except Exception as e:
             print("Model popup not found", e)
-        
+    
+    def handle_swal_if_present(self):
+        swal = self.page.locator(".swal2-container")
+        if swal.is_visible():
+            print("SweetAlert detected. Confirming...")
+            confirm_btn = self.page.locator(".swal2-confirm")
+            if confirm_btn.is_visible(timeout=5000):
+                confirm_btn.click()
+                swal.wait_for(state="hidden", timeout=5000)
+            self.page.wait_for_timeout(1000)
+            
+    
+    def close_popup_if_exists(self):
+        self.close_all_popup_windows()
+        self.close_model_popup()
+    
+    def force_cleanup_overlays(self):
+        """Aggressively removes any SweetAlert or modal backdrops blocking the UI."""
+        self.page.evaluate("""
+            () => {
+                const selectors = [
+                    '.swal2-container', 
+                    '.swal-overlay', 
+                    '.modal-backdrop', 
+                    '.swal2-backdrop-show'
+                ];
+                selectors.forEach(selector => {
+                    const elements = document.querySelectorAll(selector);
+                    elements.forEach(el => el.remove());
+                });
+                // Restore scrolling and pointer events to the body
+                document.body.classList.remove('swal2-shown', 'swal2-height-auto');
+                document.body.style.pointerEvents = 'auto';
+            }
+        """)
+    
     def click_continue(self):
-       
+        selector = 'input[type="submit"][value="Continue"], input[value="Continue"], button:has-text("Continue")'
         try:
             #btn = self.page.locator("input[type='submit'][value='Continue']").click(timeout=5000)
-            btn = self.page.locator("input[type='submit'][value='Continue']")
+            btn = self.page.locator(selector)
             btn.wait_for(state="visible", timeout=7000)
-            btn.click(timeout=5000, force=True)
+            self.handle_swal_if_present()
+            self.force_cleanup_overlays()
+            self.page.wait_for_timeout(300)
+            try:
+                btn.click(timeout=5000)
+            except Exception as e:
+                btn.evaluate("el => el.click()")
+                    
+            #btn.click(timeout=5000)
+            self.page.wait_for_timeout(500)
+            self.page.wait_for_load_state("networkidle", timeout=20000)
+            self.page.wait_for_timeout(2000)
             return
         except Exception as e:
             print(e)
@@ -74,11 +122,7 @@ class EgrassGrnPage(BasePage):
     
     def proceed(self):
         try:
-            self.close_all_popup_windows()
-            print("closed all popup windows....")
-            self.wait_for_timeout(3000)
-            self.close_model_popup()
-            print("closed model popup....")
+            self.close_popup_if_exists()
             self.wait_for_timeout(2000)
             self.page.wait_for_selector('input[type="submit"][value="Continue"]', timeout=5000)
             print("contine button visible....")

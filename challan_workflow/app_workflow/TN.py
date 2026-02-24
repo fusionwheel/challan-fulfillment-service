@@ -7,12 +7,13 @@ from challan_workflow.steps.core.page_config import StealthPageConfig
 from challan_workflow.steps.core.common import InitiatePaymentLink
 from challan_workflow.steps.core.common import SBIAggregatePage
 from challan_workflow.steps.core.sbi_epay import SBIePayPaymentPage
+from challan_workflow.steps.egras.TN import TNSBILandingPage
 from challan_workflow.steps.netbanking.icici import IciciLoginPage, IciciTransactionPage, IciciTransactionOTPPage
 from challan_workflow.steps.gateway.billdesk import BillDeskSDKPaymentPage
 from challan_workflow.steps.receipt.download import DownloadReceiptPage
 
 class TNWorkflow(BaseWorkflow):
-    steps = [
+    steps_1 = [
         GoTOeChallanPage,
         EnablePopupAutoClosePageConfig,
         EnableSwalAutoClosePageConfig,
@@ -24,3 +25,23 @@ class TNWorkflow(BaseWorkflow):
         IciciTransactionOTPPage,
         DownloadReceiptPage         
     ]
+    
+    steps_2 = [
+        GoTOeChallanPage,
+        EnablePopupAutoClosePageConfig,
+        EnableSwalAutoClosePageConfig,
+        InitiatePaymentLink,
+        TNSBILandingPage,
+        SBIePayPaymentPage,
+        IciciLoginPage,
+        IciciTransactionPage,
+        IciciTransactionOTPPage,
+        DownloadReceiptPage         
+    ]
+    
+    def get_workflow_steps(self):
+        print("self.context.url => ", self.context.url)
+        if "sbilanding" in self.context.url.lower():
+            return self.steps_2
+        else:
+            return self.steps_1

@@ -254,10 +254,14 @@ class FWLink:
                 print("  FW service | Payment Link Generation | message: ", message)
                 print("  FW service | Payment Link Generation | reason: ", reason)
                 print("-"*50)
+                if verify_payment == 1 and "payment is failed" in str(message).lower():
+                    print("  FW service | Payment Link Verification | Successfully Verified")
+                    return True
                 
                 if "payment is pending" in message or "payment is pending" in reason:
+                    print("  FW service | PaymentLink Already Generated ", data)
                     if str(self.challan_no)[:2] in ["AP", "KL", "TN"]:                        
-                        print("  FW service | Payment Already Pending | attempting with verify_payment for  =>", verify_payment)
+                        print("  FW service | Payment Already Pending | attempting with verify_payment for  =>", 1)
                         try:
                             self.generate_payment_link(verify_payment=1)
                         except Exception as e:

@@ -31,7 +31,7 @@ class BasePage:
             print("click by mouse")
         else:
             # Fallback if bounding box isn't found
-            element.click()
+            element.click(force=True)
             print("click by script")
             
     def human_click(self, selector: str):
@@ -51,13 +51,16 @@ class BasePage:
             print("click by mouse", selector)
         else:
             # Fallback if bounding box isn't found
-            element.click()
+            element.click(force=True)
             print("click by script", selector)
             
     def wait_for_page_to_load(self):
         self.page.wait_for_load_state("load")
-        self.page.wait_for_load_state("networkidle")
         self.page.wait_for_load_state("domcontentloaded")
+        try:
+            self.page.wait_for_load_state("networkidle")
+        except Exception as e:
+            print("networkidle failed", e)
         self.page.wait_for_timeout(2000)
     
     def simulate_mouse_move(self):
@@ -96,17 +99,27 @@ class BasePage:
 class GoTOeChallanPage(BasePage):
     
     def proceed(self):
-        try:
-            print("Navigating to challan page...")
-            self.page.set_default_timeout(10000)
-            self.page.set_default_navigation_timeout(10000)
+        last_exception = None
+        
+        for i in range(2):
+            try:
+                print("Navigating to challan page...")
+                self.page.set_default_timeout(10000)
+                self.page.set_default_navigation_timeout(20000)
+                
+                self.page.goto("https://echallan.parivahan.gov.in", wait_until="domcontentloaded", timeout=15000)
+                self.page.wait_for_timeout(1000)
+                
+                self.update_status("success", "CHALLAN_PAGE_LOADED", "Challan page loaded successfully", "CHALLAN_PAGE")
+                last_exception = None
+                return
+            except Exception as e:
+                self.update_status("failed", "CHALLAN_PAGE_FAILED", "Challan page loading failed", "CHALLAN_PAGE")
+                last_exception = e
+                continue
             
-            self.page.goto("https://echallan.parivahan.gov.in", wait_until="domcontentloaded")
-            self.page.wait_for_timeout(1000)
-            self.update_status("success", "CHALLAN_PAGE_LOADED", "Challan page loaded successfully", "CHALLAN_PAGE")
-        except Exception as e:
-            self.update_status("failed", "CHALLAN_PAGE_FAILED", "Challan page loading failed", "CHALLAN_PAGE")
-            raise e
+        if last_exception:
+            raise last_exception
         
     
     
@@ -401,34 +414,46 @@ class SBIAggregatePage(BasePage):
         dropdown.select_option(label=self.get_gateway_name())
     
     def select_payment_gateway(self):
+        gateway_name = self.get_gateway_name()
         try:
-            print("Selecting payment gateway", self.get_gateway_name())
-            self.select_option_element_by_text('#dropOperator', self.get_gateway_name())
+            print("Selecting payment gateway", gateway_name)
+            self.select_option_element_by_text('#dropOperator', gateway_name)
         except Exception as e:
             print("Selecting payment gateway failed", e)
             self.select_payment_gateway_fallback()
     
     def check_tnc(self):
-        self.page.locator('#checkme').click()
+        tnc_checkbox = self.page.locator('#checkme')
+        tnc_checkbox.wait_for(state="visible")
+        tnc_checkbox.click(force=True)
         #self.human_click('#checkme')
     
     def click_submit(self):
-        #self.human_click('#sendSubmit')
-        self.page.locator('#sendSubmit').click()
+        submit_button = self.page.locator('#sendSubmit')
+        submit_button.wait_for(state="visible", timeout=10000)
+        url = self.page.url
+        try:
+            with self.page.expect_navigation(wait_until="domcontentloaded", timeout=20000):
+                submit_button.click()
+        except Exception as e:
+            if url not in self.page.url.lower(): 
+                return
+            print("Clicking submit button failed", e)
+            raise e
     
     def proceed(self):
         try:
+            self.page.wait_for_selector('#dropOperator', state="visible", timeout=20000)
+            
             self.select_payment_gateway()
-            self.wait_for_timeout(1000)
+            self.page.wait_for_timeout(1000)
             self.check_tnc()
-            self.wait_for_timeout(1000)
-            self.wait_for_element_to_be_visible('#sendSubmit')
+            self.page.wait_for_timeout(1000)
             self.click_submit()
-            self.page.wait_for_load_state("load", timeout=20000)
-            self.page.wait_for_load_state("networkidle")
-            self.wait_for_timeout(1000)
+             
             self.update_status("success", "GATEWAY_TNC_CHECK_SUCCESS", "Gateway tnc checked successfully", step="SBI_AGGREGATE_PAGE")
-            return self.next_page()
+            return self.page.url
+            #return self.next_page()
         except Exception as e:
             self.update_status("failed", "GATEWAY_TNC_CHECK_FAILED", "Gateway tnc check failed", step="SBI_AGGREGATE_PAGE")
             raise e
@@ -459,6 +484,7 @@ class WhichNetBankingProviderSBIAggregatePage(BasePage):
     def proceed(self):
         try:
             self.wait_for_timeout(1000)
+            self.page.wait_for_load_state("load", timeout=10000)
             self.select_other_netbanking()   
             self.scroll_to_bottom()
             self.scroll_to_top()

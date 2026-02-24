@@ -28,12 +28,19 @@ class UPRajKoshLandingPage(BasePage):
                 self.page.wait_for_selector("#popDiv", state="visible", timeout=5000)
                 
                 self.update_status("success", "RAJKOSH_LANDING_SUCCESS", "GRN generated successfully", step="RAJKOSH_UP_LANDING_PAGE")
-                break
+                return
             except Exception as e:
                 self.page.go_back()
                 self.page.wait_for_timeout(2000)
                 self.wait_for_page_to_load()
                 self.page.wait_for_load_state("domcontentloaded")
+                try:
+                    self.page.wait_for_selector("#popDiv", state="visible", timeout=10000)
+                    self.update_status("success", "RAJKOSH_LANDING_SUCCESS", "GRN generated successfully", step="RAJKOSH_UP_LANDING_PAGE")
+                    return
+                except:
+                    pass
+                
                 self.update_status("failed", "RAJKOSH_LANDING_FAILED", "GRN generation failed", step="RAJKOSH_UP_LANDING_PAGE")
                 if i == 1:
                     raise e
@@ -55,7 +62,7 @@ class UPRajKoshPage(BasePage):
     def click_proceed(self):
         try:
             btn = self.page.get_by_text(re.compile("Proceed With Net", re.IGNORECASE))
-            if btn.is_visible():
+            if btn.is_visible(timeout=5000):
                 self.human_click_by_element(btn)
                 return
         except:
@@ -64,7 +71,7 @@ class UPRajKoshPage(BasePage):
         
         try:
             btn = self.page.locator("input[type='submit']").first
-            if btn.is_visible():
+            if btn.is_visible(timeout=5000):
                 btn.click(timeout=5000)
                 return
         except:
@@ -74,7 +81,7 @@ class UPRajKoshPage(BasePage):
         for frame in self.page.frames:
             try:
                 btn = frame.locator("button:has-text('Proceed')")
-                if btn.is_visible():
+                if btn.is_visible(timeout=5000):
                     self.human_click_by_element(btn)
                     return
             except:

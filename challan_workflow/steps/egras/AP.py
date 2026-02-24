@@ -45,23 +45,21 @@ class APTreasuryGrnPage(BasePage):
         
         try:
             self.wait_for_page_to_load()
-            self.page.wait_for_load_state("domcontentloaded")
             self.wait_for_timeout(1000)
             
             self.online_payment_click()
             
             self.wait_for_page_to_load()
-            self.page.wait_for_load_state("domcontentloaded")
             self.wait_for_timeout(1000)
             
             self.sbi_aggregate_click()
             
             self.wait_for_page_to_load()
-            self.page.wait_for_load_state("domcontentloaded")
             self.wait_for_timeout(1000)    
         
             self.update_status("success", "GRN_SUCCESS", "Payment link initialized successfully", step="AP_TREASURY_PAGE")
         except Exception as e:
+            self.page.pause()
             self.update_status("failed", "GRN_FAILED", "Payment link initialization failed", step="AP_TREASURY_PAGE")
             raise e
     

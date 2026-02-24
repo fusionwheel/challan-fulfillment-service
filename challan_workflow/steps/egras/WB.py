@@ -104,6 +104,7 @@ class WBGRIPSPaymentPage(BasePage):
             # Step 3: Final Pay Now
             self.click_pay_now()
             self.wait_for_timeout(1000)
+            self.page.wait_for_load_state("load", timeout=10000)
             self.update_status("success", "GRN_SUCCESS", "Payment link initialized successfully", step="GRIPS_WB_PAGE")
         except Exception as e:
             print(e)

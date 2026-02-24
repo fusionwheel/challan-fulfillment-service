@@ -13,6 +13,7 @@ class SBIePayPaymentPage(BasePage):
             
     def select_net_banking_tab(self):
         # The tab text is usually "Net Banking"
+        self.page.wait_for_selector("#activeNB", timeout=10000)
         nb_tab = self.page.locator("#activeNB > a").first
         nb_tab.wait_for(state="visible", timeout=10000)
         nb_tab.scroll_into_view_if_needed()
@@ -82,7 +83,7 @@ class SBIePayPaymentPage(BasePage):
             self.select_bank_by_name()
             self.wait_for_timeout(1000)
             self.submit_pay_now()
-            #self.wait_for_timeout(1000)
+            self.wait_for_timeout(1000)
             #self.page.screenshot(path="sbi_epay_proceed1.png")
             self.update_status("success", "INIT_SUCCESS", "Payment link initialized successfully", step="SBI_EPAY_PAGE")
             

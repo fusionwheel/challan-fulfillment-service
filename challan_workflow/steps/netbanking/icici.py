@@ -69,6 +69,8 @@ class IciciLoginPage(BasePage):
     def proceed(self):
         try:
             self.simulate_mouse_move()
+            self.page.wait_for_load_state("load")
+            self.page.wait_for_load_state("domcontentloaded")
             self.login()
             self.wait_for_page_to_load()
             self.update_status("success", "LOGIN_SUCCESS", "Login successful!", step="ICICI_LOGIN_PAGE")

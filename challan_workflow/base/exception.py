@@ -17,6 +17,12 @@ class PaymentLinkError(Exception):
 class PaymentLinkGenerationFailed(Exception):
     message = "Payment Link Generation Failed"
 
+class PaymentInitiatedRecently(Exception):
+    message = "Payment Initiated Recently. try after 15 minutes"
+
+class PaymentVerificationFailed(Exception):
+    message = "Payment verification failed"
+
 class PaymentLinkAlreadyGenerated(Exception):
     message = "Payment Link Already Generated"
 

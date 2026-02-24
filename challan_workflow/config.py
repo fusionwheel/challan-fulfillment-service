@@ -16,5 +16,5 @@ GATEWAY_NAMES = {
     "AP": "CFMS"
 }
 
-LIVE_ST_CODES = ["AS", "DL", "GJ", "KL", "HR", "MH", "TN", "UP", "WB"]
+LIVE_ST_CODES = ["AP", "AS", "DL", "GJ", "KL", "HR", "MH", "TN", "UP", "WB"]
 LIVE_CATEGORY_CODES = ['E_CHALLAN']

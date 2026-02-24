@@ -16,7 +16,7 @@ from challan_workflow.app_workflow.AP import APWorkflow
 class WorkflowManager:
     # 1. Define the mapping of states to their respective classes
     WORKFLOW_MAP = {
-        #"AP": APWorkflow,
+        "AP": APWorkflow,
         "AS": ASWorkflow,
         "DL": DLWorkflow,
         "GJ": GJWorkflow,

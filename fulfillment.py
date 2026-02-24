@@ -4,6 +4,9 @@ import shutil
 import traceback
 from datetime import datetime
 
+from playwright.sync_api import sync_playwright, Page, BrowserContext
+from playwright_stealth import Stealth
+        
 from challan_workflow.base.context import QueueContext
 from challan_workflow.app_workflow.manager import WorkflowManager
 from challan_workflow.steps.core.page_config import StealthPageConfig
@@ -24,9 +27,6 @@ def process_from_queue(order_item_id:str, reg_no:str, challan_no:str, payment_re
     # from challan_workflow.services.Parivahan import Parivahan
     # from challan_workflow.base import exception
 
-    from playwright.sync_api import sync_playwright, Page, BrowserContext
-    from playwright_stealth import Stealth
-    
     # from env 
     icici_user_id:str = os.environ.get("ICICI_NETBANKING_USER_ID")
     icici_password:str = os.environ.get("ICICI_NETBANKING_PASSWORD")
@@ -63,26 +63,29 @@ def process_from_queue(order_item_id:str, reg_no:str, challan_no:str, payment_re
             }
         
         if parivahan.is_payment_initiated_recently(pmt_st_data):
-            return {
-                "status": "FAILED",
-                #"state": "PAYMENT_INITIATED_RECENTLY",
-                "state": "LINK_FAILED",
-                "step": "LINK_GENERATION",
-                "message": "Payment already initiated recently. will be processed after 15 minutes"
-            }
+            raise exception.PaymentInitiatedRecently("Payment already initiated recently. will be processed after 15 minutes")
+            # raise for retry after 10/15 minutes
+            # return {
+            #     "status": "FAILED",
+            #     #"state": "PAYMENT_INITIATED_RECENTLY",
+            #     "state": "LINK_FAILED",
+            #     "step": "LINK_GENERATION",
+            #     "message": "Payment already initiated recently. will be processed after 15 minutes"
+            # }
         
         if parivahan.is_payment_pending(pmt_st_data):
-            if not parivahan.verify_payment(pmt_st_data):
+            is_payment_verified = parivahan.verify_payment(pmt_st_data)
+            if not is_payment_verified:
+                raise exception.PaymentVerificationFailed("Payment verification failed")
                 # After verification, check again
-                return {
-                    "status": "FAILED",
-                    #"state": "PAYMENT_PENDING",
-                    "state": "LINK_FAILED",
-                    "step": "LINK_GENERATION",
-                    "message": "Payment already in pending state"
-                }
+                # return {
+                #     "status": "FAILED",
+                #     #"state": "PAYMENT_PENDING",
+                #     "state": "LINK_FAILED",
+                #     "step": "LINK_GENERATION",
+                #     "message": "Payment already in pending state"
+                # }
                 
-    del parivahan
     
     try:
         st_cd: str = str(challan_no).upper()[:2]
@@ -99,14 +102,19 @@ def process_from_queue(order_item_id:str, reg_no:str, challan_no:str, payment_re
             netbanking_username=icici_user_id, 
             netbanking_password=icici_password
         )
+    except exception.OTPNotFound:
+        print(f"OTP not found {order_item_id}")
+        raise exception.OTPNotFound("OTP not found")
+    
     except exception.DepartmentError:
         print(f"Department Error {order_item_id}")
-        return {
-                "status": "FAILED",
-                "state": "LINK_FAILED",
-                "step": "LINK_GENERATION",
-                "message": "Department Error"
-            }
+        raise exception.DepartmentError("Department Error")
+        # return {
+        #         "status": "FAILED",
+        #         "state": "LINK_FAILED",
+        #         "step": "LINK_GENERATION",
+        #         "message": "Department Error"
+        #     }
     
     except exception.PaymentLinkOfflineChallanError:
         print(f"Offline Challan Error {order_item_id}")
@@ -119,24 +127,30 @@ def process_from_queue(order_item_id:str, reg_no:str, challan_no:str, payment_re
     
     except exception.PaymentLinkAlreadyGenerated:
         print(f"Already Generated {order_item_id}")
-        return {
-                "status": "FAILED",
-                "state": "LINK_FAILED",
-                "step": "LINK_GENERATION",
-                "message": "Payment Link Already Generated",
-            }
+        raise exception.PaymentLinkAlreadyGenerated("Payment Link Already Generated")
+        # return {
+        #         "status": "FAILED",
+        #         "state": "LINK_FAILED",
+        #         "step": "LINK_GENERATION",
+        #         "message": "Payment Link Already Generated",
+        #     }
+    except exception.PaymentLinkGenerationFailed:
+        print(f"Payment Link Generation failed {order_item_id}")
+        raise exception.PaymentLinkGenerationFailed("Payment Link Generation failed")
     
     except Exception as e:
-        print(f"Exception in Link Generation {order_item_id} | {e}")
         traceback.print_exc()
-        return {
-                "status": "FAILED",
-                "state": "LINK_FAILED",
-                "message": f"Exception: {e}",
-                "exception": str(e),
-                "step": "LINK_GENERATION"
-            }
-    thread_data_dir:str = os.path.join("./user_data", f"ctx_{order_item_id}")
+        print(f"Exception in Link Generation {order_item_id} | {e}")
+        raise e
+        
+        # return {
+        #         "status": "FAILED",
+        #         "state": "LINK_FAILED",
+        #         "message": f"Exception: {e}",
+        #         "exception": str(e),
+        #         "step": "LINK_GENERATION"
+        #     }
+    thread_data_dir:str = "./user_data" #os.path.join("./user_data", f"ctx_{order_item_id}")
     page:Page = None
     browser_ctx:BrowserContext = None
     try:
@@ -146,7 +160,7 @@ def process_from_queue(order_item_id:str, reg_no:str, challan_no:str, payment_re
             browser_ctx = p.firefox.launch_persistent_context(
                 channel="firefox", 
                 user_data_dir=thread_data_dir,
-                headless=False,
+                headless=headless,
                 #args=browser_args,
                 args=firefox_browser_args,
                 #proxy=proxy,
@@ -166,11 +180,12 @@ def process_from_queue(order_item_id:str, reg_no:str, challan_no:str, payment_re
             page:Page = browser_ctx.new_page()
             webdriver_status = page.evaluate("navigator.webdriver")
             print(f"Is Webdriver detected? {webdriver_status}")
-            path = f"screenshots/{challan_ctx.st_cd}/{datetime.now().strftime('%Y-%m-%d')}/{challan_ctx.order_item_id or challan_ctx.appointment_id}_{challan_ctx.challan_no}.png"
+            
+            path = f"screenshots/{st_cd}/{datetime.now().strftime('%Y-%m-%d')}/{challan_ctx.order_item_id or challan_ctx.appointment_id}_{challan_ctx.challan_no}.png"
             #if not os.path.exists(path):
             os.makedirs(os.path.dirname(path), exist_ok=True)
             
-            max_repeat = 1 if challan_ctx.st_cd == "UP" else 2
+            #max_repeat = 1 if challan_ctx.st_cd == "UP" else 2
             
             try:
                 # UP challan can be processed only once
@@ -241,11 +256,4 @@ def process_from_queue(order_item_id:str, reg_no:str, challan_no:str, payment_re
             "step": "LINK_GENERATION",
             "pgi_amount": 0
         }
-    finally:
-        # remove thread data dir
-        time.sleep(2)
-        try:
-            if os.path.exists(thread_data_dir):
-                shutil.rmtree(thread_data_dir, ignore_errors=True)
-        except:
-            pass
+        
